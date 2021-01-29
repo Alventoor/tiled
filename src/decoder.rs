@@ -167,7 +167,6 @@ impl<'a> TMXDecoder<'a> {
         }
 
         map.reorder_tilesets();
-        println!("{:?}", map);
         map
     }
 }
