@@ -111,10 +111,10 @@ impl<'a> TMXDecoder<'a> {
     fn tag(&mut self, attributes: &mut Attributes, map: &mut Map) {
         match self.state {
             TMXState::Map => map_tag(attributes, map),
-            TMXState::TileSet(ref mut tileset) => tileset_tag(tileset, attributes),
-            TMXState::TileSetImage(ref mut tileset) => tileset_image_tag(tileset, attributes),
-            TMXState::Tile(_, ref mut tile) => tile_tag(tile, attributes),
-            TMXState::TileImage(_, ref mut tile) => tile_image_tag(tile, attributes),
+            TMXState::TileSet(ref mut tileset) => tileset_tag(attributes, tileset),
+            TMXState::TileSetImage(ref mut tileset) => tileset_image_tag(attributes, tileset),
+            TMXState::Tile(_, ref mut tile) => tile_tag(attributes, tile),
+            TMXState::TileImage(_, ref mut tile) => tile_image_tag(attributes, tile),
             _ => { /* Nothing to do */ }
         }
     }
@@ -194,7 +194,7 @@ fn map_tag(attributes: &mut Attributes, map: &mut Map) {
     }
 }
 
-fn tileset_tag(tileset: &mut TileSet, attributes: &mut Attributes) {
+fn tileset_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
     for attribute in attributes.filter_map(|a| a.ok()) {
         if let Ok(value) = std::str::from_utf8(&attribute.value) {
             match attribute.key {
@@ -210,13 +210,13 @@ fn tileset_tag(tileset: &mut TileSet, attributes: &mut Attributes) {
     }
 }
 
-fn tileset_image_tag(tileset: &mut TileSet, attributes: &mut Attributes) {
+fn tileset_image_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
     if let Some(path) = extract_image_path(attributes) {
         tileset.origin = TileOrigin::Image(path);
     }
 }
 
-fn tile_tag(tile: &mut Tile, attributes: &mut Attributes) {
+fn tile_tag(attributes: &mut Attributes, tile: &mut Tile) {
     let encoded_data = attributes
         .filter_map(|a| a.ok())
         .find(|a| a.key == b"id")
@@ -227,7 +227,7 @@ fn tile_tag(tile: &mut Tile, attributes: &mut Attributes) {
     }
 }
 
-fn tile_image_tag(tile: &mut Tile, attributes: &mut Attributes) {
+fn tile_image_tag(attributes: &mut Attributes, tile: &mut Tile) {
     if let Some(path) = extract_image_path(attributes) {
         tile.image_path = path;
     }
