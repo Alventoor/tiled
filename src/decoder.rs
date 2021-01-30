@@ -265,7 +265,7 @@ fn data_text(bytes: &[u8], map: &mut Map) {
 
     map.tiles = encoded_data
         .split(|c: char| c == ',' || c == '\n')
-        .filter_map(|d| d.parse::<u32>().ok())
+        .filter_map(|d| d.parse().ok())
         .collect();
 }
 

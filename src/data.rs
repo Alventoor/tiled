@@ -6,20 +6,20 @@ use std::sync::Arc;
 use bevy_math::{Size, Vec2};
 
 /// Identifiant global représentant sur la map l'absence de tuile.
-pub const EMPTY_TILE: u32 = 0;
+pub const EMPTY_TILE: u16 = 0;
 
 /// Contient les données associées à une tuile.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Tile {
     /// Identifiant local (au sein du jeu de tuiles) de la tuile.
-    pub id: u32,
+    pub id: u16,
     /// Chemin d'accès de la texture associée à la tuile.
     pub image_path: String,
 }
 
 impl Tile {
     /// Crée une nouvelle tuile avec l'image et l'identifiant passés en paramètre.
-    pub fn new(id: u32, image_path: String) -> Self {
+    pub fn new(id: u16, image_path: String) -> Self {
         Tile {
             id,
             image_path
@@ -39,7 +39,7 @@ pub enum TileOrigin {
     /// Les tuiles partagent la même image.
     Image(String),
     /// Chaque tuile possède sa propre image.
-    Collection(BTreeMap<u32, Tile>),
+    Collection(BTreeMap<u16, Tile>),
     /// Les tuiles ne possèdent aucune origine.
     None,
 }
@@ -65,13 +65,13 @@ impl TileOrigin {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TileSet {
     /// Identifiant global à partir duquel la tuile appartient à ce jeu.
-    pub firstgid: u32,
+    pub firstgid: u16,
     /// Taille en pixel des tuiles du jeu.
-    pub size: Size<u32>,
+    pub size: Size<u16>,
     /// Nombre de tuiles que possède le jeu.
-    pub count: usize,
+    pub count: u16,
     /// Nombre de colonnes que possède le jeu.
-    pub columns: usize,
+    pub columns: u16,
     /// Nom du jeu de tuile.
     pub name: String,
     /// Origine des tuiles du jeu.
@@ -81,7 +81,7 @@ pub struct TileSet {
 impl TileSet {
     /// Renvoie le nombre de lignes que possède le jeu.
     #[inline]
-    pub fn rows(&self) -> usize {
+    pub fn rows(&self) -> u16 {
         self.count / self.columns
     }
 }
@@ -89,7 +89,7 @@ impl TileSet {
 impl Default for TileSet {
     fn default() -> Self {
         Self {
-            firstgid: u32::MAX,
+            firstgid: u16::MAX,
             size: Size::new(0, 0),
             count: 0,
             columns: 0,
@@ -186,11 +186,11 @@ pub struct Map {
     /// Contient pour chaque id global son jeu de tuiles.
     tilesets: Vec<Option<Arc<TileSet>>>,
     /// Taille de la map.
-    pub size: Size<u32>,
+    pub size: Size<u16>,
     /// Taille en pixels des tuiles composant la map.
-    pub tile_size: Size<u32>,
+    pub tile_size: Size<u16>,
     /// Liste d'identifiants globaux des tuiles composant la map.
-    pub tiles: Vec<u32>,
+    pub tiles: Vec<u16>,
     /// Orientation de la map.
     pub orientation: Orientation,
     /// Axe de décalage de la map.
@@ -220,9 +220,8 @@ impl Map {
 
             // On récupère le nombre de tuiles que possède le jeu.
             let tiles_nb = match &tileset.origin {
-                TileOrigin::Collection(tiles) => {
-                    *tiles.keys().next_back().unwrap_or(&0) as usize + 1
-                },
+                TileOrigin::Collection(tiles)
+                    => *tiles.keys().next_back().unwrap_or(&0) + 1,
                 TileOrigin::None | TileOrigin::Image(_) => tileset.count,
             };
 
@@ -230,7 +229,7 @@ impl Map {
                 self.tilesets.push(Some(tileset.clone()));
             }
 
-            last_gid = tileset.firstgid + tileset.count as u32 - 1;
+            last_gid = tileset.firstgid + tiles_nb - 1;
         }
     }
 
@@ -247,8 +246,8 @@ impl Map {
     }
 
     /// Renvoie le jeu de tuiles associé au gid passé en paramètre.
-    pub fn get_tileset(&self, tile_gid: u32) -> Option<&TileSet> {
-        let index = (tile_gid - 1) as usize;
+    pub fn get_tileset(&self, tile_gid: u16) -> Option<&TileSet> {
+        let index = usize::from(tile_gid - 1);
 
         if let Some(ref_tileset) = self.tilesets.get(index) {
             if let Some(tileset) = ref_tileset {
@@ -267,18 +266,18 @@ impl Map {
 
     /// Renvoie la colonne à laquelle appartient la tuile passée en paramètre.
     #[inline]
-    pub fn tile_column(&self, tile: u32) -> u32 {
+    pub fn tile_column(&self, tile: u16) -> u16 {
         tile % self.size.width
     }
 
     /// Renvoie la ligne à laquelle appartient la tuile passée en paramètre.
     #[inline]
-    pub fn tile_row(&self, tile: u32) -> u32 {
+    pub fn tile_row(&self, tile: u16) -> u16 {
         tile / self.size.width
     }
 
     /// Renvoie les coordonnées de la tuile sur la map.
-    pub fn coords(&self, tile: u32) -> (u32, u32) {
+    pub fn coords(&self, tile: u16) -> (u16, u16) {
         let x = self.tile_column(tile);
         let y = self.tile_row(tile);
 
@@ -289,21 +288,25 @@ impl Map {
     ///
     /// Attention, ces coordonnées sont relatives à la position de la map dans le
     /// monde et représente le centre de la tuile.
-    pub fn world_coords(&self, tile: u32) -> Vec2 {
+    pub fn world_coords(&self, tile: u16) -> Vec2 {
         let map_coords = self.coords(tile);
-        let width = self.tile_size.width as f32;
-        let height = self.tile_size.height as f32;
 
         let mut coords = Vec2 {
-            x: map_coords.0 as f32 * width,
-            y: map_coords.1 as f32 * -(height),
+            x: f32::from(map_coords.0 * self.tile_size.width),
+            y: -f32::from(map_coords.1 * self.tile_size.height),
         };
+
+        let half_size = Size {
+            width: f32::from(self.tile_size.width) / 2.0,
+            height: f32::from(self.tile_size.height) / 2.0,
+        };
+
         match self.tile_stagger_axis(tile) {
-            StaggerAxis::YAxis => coords.y += height / 2.0,
-            StaggerAxis::XAxis => coords.x += width / 2.0,
+            StaggerAxis::YAxis => coords.y += half_size.height,
+            StaggerAxis::XAxis => coords.x += half_size.width,
             _ => {
-                coords.y += height / 2.0;
-                coords.x += width / 2.0;
+                coords.y += half_size.height;
+                coords.x += half_size.width;
             }
         }
 
@@ -311,7 +314,7 @@ impl Map {
     }
 
     /// Renvoie l'axe de décalage de la tuile passée en paramètre.
-    pub fn tile_stagger_axis(&self, tile: u32) -> StaggerAxis {
+    pub fn tile_stagger_axis(&self, tile: u16) -> StaggerAxis {
         match self.stagger_axis {
             axis @ StaggerAxis::XAxis if self.tile_column(tile) % 2 == 0 => axis,
             axis @ StaggerAxis::YAxis if self.tile_row(tile) % 2 == 0 => axis,
