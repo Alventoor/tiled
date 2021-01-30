@@ -8,10 +8,10 @@ use bevy_math::{Size, Vec2};
 /// Identifiant global représentant sur la map l'absence de tuile.
 pub const EMPTY_TILE: u32 = 0;
 
-/// Contient les données d'une tuile.
+/// Contient les données associées à une tuile.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Tile {
-    /// Identifiant local (au sein du tileset) de la tuile.
+    /// Identifiant local (au sein du jeu de tuiles) de la tuile.
     pub id: u32,
     /// Chemin d'accès de la texture associée à la tuile.
     pub image_path: String,
@@ -33,7 +33,7 @@ impl Default for Tile {
     }
 }
 
-/// Représente l'origine des tuiles du jeu de tuiles.
+/// Origine des tuiles d'un jeu de tuiles.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TileOrigin {
     /// Les tuiles partagent la même image.
@@ -45,6 +45,10 @@ pub enum TileOrigin {
 }
 
 impl TileOrigin {
+    /// Insère une tuile dans la collection.
+    ///
+    /// Si l'origine de la tuile n'est pas une collection, alors crée une nouvelle
+    /// collection et écrase l'ancienne origine.
     pub fn insert_collection(&mut self, tile: Tile) {
         if let Self::Collection(tiles) = self {
             tiles.insert(tile.id, tile);
@@ -60,13 +64,13 @@ impl TileOrigin {
 /// Contient les paramètres d'un jeu de tuiles.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TileSet {
-    /// Identifiant global à partir du quel la tuile appartient à ce jeu.
+    /// Identifiant global à partir duquel la tuile appartient à ce jeu.
     pub firstgid: u32,
     /// Taille en pixel des tuiles du jeu.
     pub size: Size<u32>,
     /// Nombre de tuiles que possède le jeu.
     pub count: usize,
-    /// Nombre de tuiles présentes sur une colonne.
+    /// Nombre de colonnes que possède le jeu.
     pub columns: usize,
     /// Nom du jeu de tuile.
     pub name: String,
@@ -75,7 +79,7 @@ pub struct TileSet {
 }
 
 impl TileSet {
-    /// Renvoie le nombre de tuiles présentes sur une ligne.
+    /// Renvoie le nombre de lignes que possède le jeu.
     #[inline]
     pub fn rows(&self) -> usize {
         self.count / self.columns
@@ -174,16 +178,18 @@ impl FromStr for StaggerAxis {
     }
 }
 
-/// Contient toutes les informations liées à une map composée de tuiles.
+/// Contient toutes les données d'une map composée de tuiles.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Map {
+    /// Contient un unique exemplaire de chaque jeu de tuiles.
     unique_tilesets: Vec<Arc<TileSet>>,
+    /// Contient pour chaque id global son jeu de tuiles.
     tilesets: Vec<Option<Arc<TileSet>>>,
     /// Taille de la map.
     pub size: Size<u32>,
-    /// Taille des tuiles en pixels composant la map.
+    /// Taille en pixels des tuiles composant la map.
     pub tile_size: Size<u32>,
-    /// Liste des gids des tuiles composant la map.
+    /// Liste d'identifiants globaux des tuiles composant la map.
     pub tiles: Vec<u32>,
     /// Orientation de la map.
     pub orientation: Orientation,
@@ -198,7 +204,8 @@ impl Map {
         self.unique_tilesets.push(Arc::new(tileset));
     }
 
-    /// Réordonne la liste des jeux de tuiles afin qu'ils soient dans l'ordre.
+    /// Réordonne la liste des jeux de tuiles afin qu'ils soient dans l'ordre de
+    /// leur `firstgid`.
     pub(crate) fn reorder_tilesets(&mut self) {
         self.unique_tilesets.sort_unstable_by(|a, b| a.firstgid.cmp(&b.firstgid));
 

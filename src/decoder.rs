@@ -33,23 +33,23 @@ fn register_data<T>(buffer: &mut T, str: &str)
 /// Représente les différents états d'un fichier TMX lue.
 #[derive(Clone, Debug)]
 enum TMXState {
-    /// On se situe dans le tag racine `map`.
+    /// On se situe dans le tag racine `<map>`.
     Map,
-    /// On se situe dans le tag `tileset`.
+    /// On se situe dans le tag `<tileset>`.
     TileSet(TileSet),
-    /// On se situe dans le tag `image` du parent `tileset`.
+    /// On se situe dans le tag `<image>` du parent `<tileset>`.
     TileSetImage(TileSet),
-    /// On se situe dans le tag `tile` du parent `tileset`.
+    /// On se situe dans le tag `<tile>` du parent `<tileset>`.
     Tile(TileSet, Tile),
-    /// On se situe dans le tag `image` du parent `tile`.
+    /// On se situe dans le tag `<image>` du parent `<tile>`.
     TileImage(TileSet, Tile),
-    /// On se situe dans le tag `grid` du parent `tileset`.
+    /// On se situe dans le tag `<grid>` du parent `<tileset>`.
     Grid(TileSet),
-    /// On se situe dans le tag `layer`.
+    /// On se situe dans le tag `<layer>`.
     Layer,
-    /// On se situe dans le tag `data` du parent `layer`.
+    /// On se situe dans le tag `<data>` du parent `<layer>`.
     Data,
-    /// Tag inconnue. Sa donnée représente son parent.
+    /// Tag inconnu. Sa donnée représente son parent.
     Unknown(Box<TMXState>),
 }
 
@@ -87,12 +87,17 @@ impl TMXState {
     }
 }
 
+/// Permet la désérialisation du contenu d'un fichier .tmx au sein d'une
+/// structure [`Map`].
+///
+/// [`Map`]: ./struct.Map.html
 pub struct TMXDecoder<'a> {
     xml_reader: Reader<&'a [u8]>,
     state: TMXState,
 }
 
 impl<'a> TMXDecoder<'a> {
+    /// Crée un nouveau décodeur travaillant sur les données passées en paramètre.
     #[inline]
     pub fn from<B: AsRef<[u8]>>(data: &'a B) -> Self {
         Self::_from(data.as_ref())
@@ -108,6 +113,8 @@ impl<'a> TMXDecoder<'a> {
         }
     }
 
+    /// Récupère au sein de la map les données associées aux attributs du tag
+    /// actuellement lu.
     fn tag(&mut self, attributes: &mut Attributes, map: &mut Map) {
         match self.state {
             TMXState::Map => map_tag(attributes, map),
@@ -119,12 +126,15 @@ impl<'a> TMXDecoder<'a> {
         }
     }
 
+    /// Récupère au sein de la map les données associées au texte du tag
+    /// actuellement lu.
     fn text(&mut self, bytes: &[u8], map: &mut Map) {
         if let TMXState::Data = self.state {
             data_text(bytes, map);
         }
     }
 
+    /// Quitte le tag actuel, en exécutant diverses action de fin selon celui-ci.
     fn end(&mut self, map: &mut Map) {
         let state = std::mem::replace(&mut self.state, TMXState::Map);
 
@@ -141,6 +151,7 @@ impl<'a> TMXDecoder<'a> {
         };
     }
 
+    /// Charge une nouvelle map à l'aide des données du décodeur.
     pub fn load_map(mut self) -> Map {
         let mut map = Map::default();
         let mut buffer = Vec::new();
@@ -171,6 +182,10 @@ impl<'a> TMXDecoder<'a> {
     }
 }
 
+/// Récupère le chemin d'accès d'une image si présent parmi les attributs.
+///
+/// La clef associée au chemin d'accès doit être "source".
+/// Exemple : <.. source="path">
 fn extract_image_path(attributes: &mut Attributes) -> Option<String> {
     attributes
         .filter_map(|a| a.ok())
@@ -178,6 +193,8 @@ fn extract_image_path(attributes: &mut Attributes) -> Option<String> {
         .map(|a| String::from_utf8_lossy(&a.value).trim_start_matches("../").to_string())
 }
 
+/// Récupère les paramètres de la map associés au tag `<map>` si présents dans
+/// la liste d'attributs.
 fn map_tag(attributes: &mut Attributes, map: &mut Map) {
     for attribute in attributes.filter_map(|a| a.ok()) {
         if let Ok(value) = std::str::from_utf8(&attribute.value) {
@@ -194,6 +211,8 @@ fn map_tag(attributes: &mut Attributes, map: &mut Map) {
     }
 }
 
+/// Récupère les paramètres de jeu de tuiles associés au tag `<tileset>` si
+/// présents dans la liste d'attributs.
 fn tileset_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
     for attribute in attributes.filter_map(|a| a.ok()) {
         if let Ok(value) = std::str::from_utf8(&attribute.value) {
@@ -210,12 +229,16 @@ fn tileset_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
     }
 }
 
+/// Récupère le chemin d'accès de l'image d'un jeu de tuiles associé au tag
+/// `<tileset><image ../></tileset>` si présent dans la liste d'attributs.
 fn tileset_image_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
     if let Some(path) = extract_image_path(attributes) {
         tileset.origin = TileOrigin::Image(path);
     }
 }
 
+/// Récupère les paramètres de tuile associés au tag `<tile>` si présents dans
+/// la liste d'attributs.
 fn tile_tag(attributes: &mut Attributes, tile: &mut Tile) {
     let encoded_data = attributes
         .filter_map(|a| a.ok())
@@ -227,12 +250,16 @@ fn tile_tag(attributes: &mut Attributes, tile: &mut Tile) {
     }
 }
 
+/// Récupère le chemin d'accès de l'image d'une tuile associé au tag
+/// `<tile><image ../></tile>` si présent dans la liste d'attributs.
 fn tile_image_tag(attributes: &mut Attributes, tile: &mut Tile) {
     if let Some(path) = extract_image_path(attributes) {
         tile.image_path = path;
     }
 }
 
+/// Récupère les identifiants globaux des tuiles présents au sein du tag
+/// `<data>`.
 fn data_text(bytes: &[u8], map: &mut Map) {
     let encoded_data = String::from_utf8_lossy(&bytes);
 
