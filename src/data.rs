@@ -302,10 +302,10 @@ impl Map {
         };
 
         match self.tile_stagger_axis(tile) {
-            StaggerAxis::YAxis => coords.y += half_size.height,
+            StaggerAxis::YAxis => coords.y -= half_size.height,
             StaggerAxis::XAxis => coords.x += half_size.width,
             _ => {
-                coords.y += half_size.height;
+                coords.y -= half_size.height;
                 coords.x += half_size.width;
             }
         }
