@@ -34,7 +34,7 @@ impl Default for Tile {
 }
 
 /// Représente l'origine des tuiles du jeu de tuiles.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TileOrigin {
     /// Les tuiles partagent la même image.
     Image(String),
@@ -58,7 +58,7 @@ impl TileOrigin {
 }
 
 /// Contient les paramètres d'un jeu de tuiles.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TileSet {
     /// Identifiant global à partir du quel la tuile appartient à ce jeu.
     pub firstgid: u32,
@@ -97,7 +97,7 @@ impl Default for TileSet {
 
 /// Représente les erreurs possibles lors de la conversion d'une chaîne de
 /// caractère.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParsingError {
     /// La chaîne de caractère est vide.
     EmptyString,
@@ -175,7 +175,7 @@ impl FromStr for StaggerAxis {
 }
 
 /// Contient toutes les informations liées à une map composée de tuiles.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Map {
     unique_tilesets: Vec<Arc<TileSet>>,
     tilesets: Vec<Option<Arc<TileSet>>>,
