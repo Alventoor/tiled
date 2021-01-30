@@ -268,3 +268,131 @@ fn data_text(bytes: &[u8], map: &mut Map) {
         .filter_map(|d| d.parse::<u32>().ok())
         .collect();
 }
+
+#[cfg(test)]
+mod tests {
+    use bevy_math::Size;
+    use quick_xml::events::attributes::Attributes;
+    use super::*;
+
+    #[test]
+    fn register_data_test() {
+        let correct_nb = 16;
+        let str = correct_nb.to_string();
+
+        let mut nb = 0;
+
+        register_data(&mut nb, &str);
+        assert_eq!(nb, correct_nb);
+    }
+
+    #[test]
+    fn extract_image_path_test() {
+        let buf = b"< source=\"path\" >";
+        let mut attributes = Attributes::new(buf, 0);
+
+        let path = extract_image_path(&mut attributes);
+        assert_eq!(path, Some(String::from("path")));
+    }
+
+    #[test]
+    fn map_tag_test() {
+        let mut correct_map = Map::default();
+        correct_map.size = Size::new(10, 8);
+        correct_map.tile_size = Size::new(32, 16);
+        correct_map.orientation = Orientation::Orthogonal;
+        correct_map.stagger_axis = StaggerAxis::XAxis;
+
+        let buf = format!(
+            "< width=\"{}\" height=\"{}\", tilewidth=\"{}\" tileheight=\"{}\" orientation=\"orthogonal\", staggeraxis=\"x\" >",
+            correct_map.size.width, correct_map.size.height,
+            correct_map.tile_size.width, correct_map.tile_size.height
+        );
+
+        let mut map = Map::default();
+        let mut attributes = Attributes::new(buf.as_bytes(), 0);
+
+        map_tag(&mut attributes, &mut map);
+        assert_eq!(map.size, correct_map.size);
+        assert_eq!(map.tile_size, correct_map.tile_size);
+        assert_eq!(map.orientation, correct_map.orientation);
+        assert_eq!(map.stagger_axis, correct_map.stagger_axis);
+    }
+
+    #[test]
+    fn tileset_tag_test() {
+        let correct_tileset = TileSet {
+            firstgid: 1,
+            size: Size::new(64, 32),
+            count: 6,
+            columns: 2,
+            name: String::from("correct tileset"),
+            origin: TileOrigin::None
+        };
+
+        let buf = format!(
+            "< firstgid=\"{}\" tilewidth=\"{}\" tileheight=\"{}\" tilecount=\"{}\", columns=\"{}\" name=\"{}\" >",
+            correct_tileset.firstgid, correct_tileset.size.width,
+            correct_tileset.size.height, correct_tileset.count,
+            correct_tileset.columns, correct_tileset.name
+        );
+
+        let mut tileset = TileSet::default();
+        let mut attributes = Attributes::new(buf.as_bytes(), 0);
+
+        tileset_tag(&mut attributes, &mut tileset);
+        assert_eq!(tileset.firstgid, correct_tileset.firstgid);
+        assert_eq!(tileset.size, correct_tileset.size);
+        assert_eq!(tileset.count, correct_tileset.count);
+        assert_eq!(tileset.columns, correct_tileset.columns);
+        assert_eq!(tileset.name, correct_tileset.name);
+    }
+
+    #[test]
+    fn tileset_image_tag_test() {
+        let correct_origin = TileOrigin::Image(String::from("path"));
+        let buf = b"< source=\"path\" >";
+
+        let mut tileset = TileSet::default();
+        let mut attributes = Attributes::new(buf, 0);
+
+        tileset_image_tag(&mut attributes, &mut tileset);
+        assert_eq!(tileset.origin, correct_origin);
+    }
+
+    #[test]
+    fn tile_tag_test() {
+        let correct_id = 2;
+        let buf = b"< id=\"2\" >";
+
+        let mut tile = Tile::default();
+        let mut attributes = Attributes::new(buf, 0);
+
+        tile_tag(&mut attributes, &mut tile);
+        assert_eq!(tile.id, correct_id);
+    }
+
+    #[test]
+    fn tile_image_tag_test() {
+        let correct_path = String::from("path");
+        let buf = b"< source=\"path\" >";
+
+        let mut tile = Tile::default();
+        let mut attributes = Attributes::new(buf, 0);
+
+        tile_image_tag(&mut attributes, &mut tile);
+        assert_eq!(tile.image_path, correct_path);
+    }
+
+    #[test]
+    fn data_text_test() {
+        let mut correct_map = Map::default();
+        correct_map.tiles = vec![0, 0, 0, 3, 2, 1];
+
+        let mut map = Map::default();
+        let bytes = b"0,0,0,\n3,2,1";
+
+        data_text(bytes, &mut map);
+        assert_eq!(map.tiles, correct_map.tiles);
+    }
+}
