@@ -171,7 +171,7 @@ impl FromStr for StaggerAxis {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "x" => Ok(Self::XAxis),
-            "y" => Ok(Self::XAxis),
+            "y" => Ok(Self::YAxis),
             "" => Err(ParsingError::EmptyString),
             _ => Err(ParsingError::InvalidString(String::from(s))),
         }
