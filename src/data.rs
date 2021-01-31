@@ -381,3 +381,76 @@ impl Default for Map {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_SIZE: Size<u16> = Size { width: 16, height: 16 };
+
+    #[test]
+    fn tile_id_test() {
+        let mut map = Map::default();
+        map.size = TEST_SIZE;
+
+        assert_eq!(map.tile_id((0, 0)), 0);
+        assert_eq!(map.tile_id((3, 0)), 3);
+        assert_eq!(map.tile_id((3, 1)), 19);
+    }
+
+    #[test]
+    fn coords_test() {
+        let mut map = Map::default();
+        map.size = TEST_SIZE;
+
+        assert_eq!(map.coords(0), (0, 0));
+        assert_eq!(map.coords(3), (3, 0));
+        assert_eq!(map.coords(19), (3, 1));
+    }
+
+    #[test]
+    fn orthogonal_to_world_coords_test() {
+        let mut map = Map::default();
+        map.tile_size = TEST_SIZE;
+
+        assert_eq!(map.to_world_coords((3, 1)), Vec2::new(56.0, -24.0));
+    }
+
+    #[test]
+    fn hexagonal_to_world_coords_test() {
+        let mut map = Map::default();
+        map.orientation = Orientation::Hexagonal;
+        map.tile_size = TEST_SIZE;
+
+        let even_coords = (2, 2);
+        let x_odd_coords = (3, 2);
+        let y_odd_coords = (2, 3);
+
+        map.stagger_axis = StaggerAxis::XAxis;
+        assert_eq!(map.to_world_coords(even_coords), Vec2::new(32.0, -40.0));
+        assert_eq!(map.to_world_coords(x_odd_coords), Vec2::new(44.0, -48.0));
+
+        map.stagger_axis = StaggerAxis::YAxis;
+        assert_eq!(map.to_world_coords(even_coords), Vec2::new(40.0, -32.0));
+        assert_eq!(map.to_world_coords(y_odd_coords), Vec2::new(48.0, -44.0));
+    }
+
+    #[test]
+    fn coords_stagger_axis_test() {
+        let mut map = Map::default();
+
+        assert_eq!(map.coords_stagger_axis((0, 0)), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis((1, 0)), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis((0, 1)), StaggerAxis::None);
+
+        map.stagger_axis = StaggerAxis::XAxis;
+        assert_eq!(map.coords_stagger_axis((0, 0)), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis((1, 0)), StaggerAxis::XAxis);
+        assert_eq!(map.coords_stagger_axis((0, 1)), StaggerAxis::None);
+
+        map.stagger_axis = StaggerAxis::YAxis;
+        assert_eq!(map.coords_stagger_axis((0, 0)), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis((1, 0)), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis((0, 1)), StaggerAxis::YAxis);
+    }
+}
