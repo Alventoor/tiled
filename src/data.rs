@@ -276,6 +276,19 @@ impl Map {
         tile / self.size.width
     }
 
+    /// Renvoie l'id de la tuile appartenant aux coordonnées spécifiées.
+    #[inline]
+    pub fn tile_id(&self, coords: (u16, u16)) -> u16 {
+        coords.0 + coords.1 * self.size.width
+    }
+
+    /// Renvoie l'identifiant global de la tuile appartenant aux coordonnées
+    /// spécifiées.
+    #[inline]
+    pub fn tile_gid(&self, coords: (u16, u16)) -> u16 {
+        *self.tiles.get(usize::from(self.tile_id(coords))).unwrap_or(&EMPTY_TILE)
+    }
+
     /// Renvoie les coordonnées de la tuile sur la map.
     pub fn coords(&self, tile: u16) -> (u16, u16) {
         let x = self.tile_column(tile);
@@ -288,25 +301,50 @@ impl Map {
     ///
     /// Attention, ces coordonnées sont relatives à la position de la map dans le
     /// monde et représente le centre de la tuile.
+    #[inline]
     pub fn world_coords(&self, tile: u16) -> Vec2 {
-        let map_coords = self.coords(tile);
+        self.to_world_coords(self.coords(tile))
+    }
+
+    /// Convertie les coordonnées de la map en coordonnées du monde.
+    ///
+    /// Attention, ces coordonnées sont relatives à la position de la map dans le
+    /// monde et représente le centre de la tuile.
+    pub fn to_world_coords(&self, map_coords: (u16, u16)) -> Vec2 {
+        let size = Size {
+            width: f32::from(self.tile_size.width),
+            height: f32::from(self.tile_size.height),
+        };
+
+        let multiplier = match (self.orientation, self.stagger_axis) {
+            (Orientation::Hexagonal, StaggerAxis::XAxis) => Vec2 {
+                x: size.width * 0.75,
+                y: size.height,
+            },
+            (Orientation::Hexagonal, StaggerAxis::YAxis) => Vec2 {
+                x: size.width,
+                y: size.height * 0.75,
+            },
+            _ => Vec2 { x: size.width, y: size.height },
+        };
 
         let mut coords = Vec2 {
-            x: f32::from(map_coords.0 * self.tile_size.width),
-            y: -f32::from(map_coords.1 * self.tile_size.height),
+            x: f32::from(map_coords.0) * multiplier.x,
+            y: -f32::from(map_coords.1) * multiplier.y,
         };
 
-        let half_size = Size {
-            width: f32::from(self.tile_size.width) / 2.0,
-            height: f32::from(self.tile_size.height) / 2.0,
-        };
-
-        match self.tile_stagger_axis(tile) {
-            StaggerAxis::YAxis => coords.y -= half_size.height,
-            StaggerAxis::XAxis => coords.x += half_size.width,
-            _ => {
-                coords.y -= half_size.height;
-                coords.x += half_size.width;
+        match self.coords_stagger_axis(map_coords) {
+            StaggerAxis::YAxis => {
+                coords.y -= size.height / 2.0;
+                coords.x += size.width;
+            },
+            StaggerAxis::XAxis => {
+                coords.y -= size.height;
+                coords.x += size.width / 2.0;
+            },
+            StaggerAxis::None => {
+                coords.y -= size.height / 2.0;
+                coords.x += size.width / 2.0;
             }
         }
 
@@ -314,10 +352,17 @@ impl Map {
     }
 
     /// Renvoie l'axe de décalage de la tuile passée en paramètre.
+    #[inline]
     pub fn tile_stagger_axis(&self, tile: u16) -> StaggerAxis {
+        self.coords_stagger_axis(self.coords(tile))
+    }
+
+    /// Renvoie l'axe de décalage de la tuile dont les coordonnées sont passés en
+    /// paramètre.
+    pub fn coords_stagger_axis(&self, coords: (u16, u16)) -> StaggerAxis {
         match self.stagger_axis {
-            axis @ StaggerAxis::XAxis if self.tile_column(tile) % 2 == 0 => axis,
-            axis @ StaggerAxis::YAxis if self.tile_row(tile) % 2 == 0 => axis,
+            axis @ StaggerAxis::XAxis if coords.0 % 2 == 1 => axis,
+            axis @ StaggerAxis::YAxis if coords.1 % 2 == 1 => axis,
             _ => StaggerAxis::None,
         }
     }
