@@ -143,11 +143,11 @@ impl FromStr for Orientation {
     type Err = ParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        match s.to_ascii_lowercase().as_str() {
             "orthogonal" => Ok(Self::Orthogonal),
             "isometric" => Ok(Self::Isometric),
             "staggered" => Ok(Self::Staggered),
-            "Hexagonal" => Ok(Self::Hexagonal),
+            "hexagonal" => Ok(Self::Hexagonal),
             "" => Err(ParsingError::EmptyString),
             _ => Err(ParsingError::InvalidString(String::from(s))),
         }
@@ -169,7 +169,7 @@ impl FromStr for StaggerAxis {
     type Err = ParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        match s.to_ascii_lowercase().as_str() {
             "x" => Ok(Self::XAxis),
             "y" => Ok(Self::YAxis),
             "" => Err(ParsingError::EmptyString),
