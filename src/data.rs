@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use bevy_math::{Size, Vec2};
+use mint::{Point2, Vector2};
 
 /// Identifiant global représentant sur la map l'absence de tuile.
 pub const EMPTY_TILE: u16 = 0;
@@ -67,7 +67,7 @@ pub struct TileSet {
     /// Identifiant global à partir duquel la tuile appartient à ce jeu.
     pub firstgid: u16,
     /// Taille en pixel des tuiles du jeu.
-    pub size: Size<u16>,
+    pub size: Vector2<u16>,
     /// Nombre de tuiles que possède le jeu.
     pub count: u16,
     /// Nombre de colonnes que possède le jeu.
@@ -90,7 +90,7 @@ impl Default for TileSet {
     fn default() -> Self {
         Self {
             firstgid: u16::MAX,
-            size: Size::new(0, 0),
+            size: Vector2 { x: 0, y: 0 },
             count: 0,
             columns: 0,
             name: String::from("unnamed"),
@@ -186,9 +186,9 @@ pub struct Map {
     /// Contient pour chaque id global son jeu de tuiles.
     tilesets: Vec<Option<Arc<TileSet>>>,
     /// Taille de la map.
-    pub size: Size<u16>,
+    pub size: Vector2<u16>,
     /// Taille en pixels des tuiles composant la map.
-    pub tile_size: Size<u16>,
+    pub tile_size: Vector2<u16>,
     /// Liste d'identifiants globaux des tuiles composant la map.
     pub tiles: Vec<u16>,
     /// Orientation de la map.
@@ -267,34 +267,34 @@ impl Map {
     /// Renvoie la colonne à laquelle appartient la tuile passée en paramètre.
     #[inline]
     pub fn tile_column(&self, tile: u16) -> u16 {
-        tile % self.size.width
+        tile % self.size.x
     }
 
     /// Renvoie la ligne à laquelle appartient la tuile passée en paramètre.
     #[inline]
     pub fn tile_row(&self, tile: u16) -> u16 {
-        tile / self.size.width
+        tile / self.size.x
     }
 
     /// Renvoie l'id de la tuile appartenant aux coordonnées spécifiées.
     #[inline]
-    pub fn tile_id(&self, coords: (u16, u16)) -> u16 {
-        coords.0 + coords.1 * self.size.width
+    pub fn tile_id(&self, coords: Point2<u16>) -> u16 {
+        coords.x + coords.y * self.size.x
     }
 
     /// Renvoie l'identifiant global de la tuile appartenant aux coordonnées
     /// spécifiées.
     #[inline]
-    pub fn tile_gid(&self, coords: (u16, u16)) -> u16 {
+    pub fn tile_gid(&self, coords: Point2<u16>) -> u16 {
         *self.tiles.get(usize::from(self.tile_id(coords))).unwrap_or(&EMPTY_TILE)
     }
 
     /// Renvoie les coordonnées de la tuile sur la map.
-    pub fn coords(&self, tile: u16) -> (u16, u16) {
-        let x = self.tile_column(tile);
-        let y = self.tile_row(tile);
-
-        (x, y)
+    pub fn coords(&self, tile: u16) -> Point2<u16> {
+        Point2 {
+            x: self.tile_column(tile),
+            y: self.tile_row(tile),
+        }
     }
 
     /// Renvoie les coordonnées de la tuile dans le monde.
@@ -302,7 +302,7 @@ impl Map {
     /// Attention, ces coordonnées sont relatives à la position de la map dans le
     /// monde et représente le centre de la tuile.
     #[inline]
-    pub fn world_coords(&self, tile: u16) -> Vec2 {
+    pub fn world_coords(&self, tile: u16) -> Point2<f32> {
         self.to_world_coords(self.coords(tile))
     }
 
@@ -310,41 +310,41 @@ impl Map {
     ///
     /// Attention, ces coordonnées sont relatives à la position de la map dans le
     /// monde et représente le centre de la tuile.
-    pub fn to_world_coords(&self, map_coords: (u16, u16)) -> Vec2 {
-        let size = Size {
-            width: f32::from(self.tile_size.width),
-            height: f32::from(self.tile_size.height),
+    pub fn to_world_coords(&self, map_coords: Point2<u16>) -> Point2<f32> {
+        let size = Vector2 {
+            x: f32::from(self.tile_size.x),
+            y: f32::from(self.tile_size.y),
         };
 
         let multiplier = match (self.orientation, self.stagger_axis) {
-            (Orientation::Hexagonal, StaggerAxis::XAxis) => Vec2 {
-                x: size.width * 0.75,
-                y: size.height,
+            (Orientation::Hexagonal, StaggerAxis::XAxis) => Point2 {
+                x: size.x * 0.75,
+                y: size.y,
             },
-            (Orientation::Hexagonal, StaggerAxis::YAxis) => Vec2 {
-                x: size.width,
-                y: size.height * 0.75,
+            (Orientation::Hexagonal, StaggerAxis::YAxis) => Point2 {
+                x: size.x,
+                y: size.y * 0.75,
             },
-            _ => Vec2 { x: size.width, y: size.height },
+            _ => Point2::from(size),
         };
 
-        let mut coords = Vec2 {
-            x: f32::from(map_coords.0) * multiplier.x,
-            y: -f32::from(map_coords.1) * multiplier.y,
+        let mut coords = Point2 {
+            x: f32::from(map_coords.x) * multiplier.x,
+            y: -f32::from(map_coords.y) * multiplier.y,
         };
 
         match self.coords_stagger_axis(map_coords) {
             StaggerAxis::YAxis => {
-                coords.y -= size.height / 2.0;
-                coords.x += size.width;
+                coords.y -= size.y / 2.0;
+                coords.x += size.x;
             },
             StaggerAxis::XAxis => {
-                coords.y -= size.height;
-                coords.x += size.width / 2.0;
+                coords.y -= size.y;
+                coords.x += size.x / 2.0;
             },
             StaggerAxis::None => {
-                coords.y -= size.height / 2.0;
-                coords.x += size.width / 2.0;
+                coords.y -= size.y / 2.0;
+                coords.x += size.x / 2.0;
             }
         }
 
@@ -359,10 +359,10 @@ impl Map {
 
     /// Renvoie l'axe de décalage de la tuile dont les coordonnées sont passés en
     /// paramètre.
-    pub fn coords_stagger_axis(&self, coords: (u16, u16)) -> StaggerAxis {
+    pub fn coords_stagger_axis(&self, coords: Point2<u16>) -> StaggerAxis {
         match self.stagger_axis {
-            axis @ StaggerAxis::XAxis if coords.0 % 2 == 1 => axis,
-            axis @ StaggerAxis::YAxis if coords.1 % 2 == 1 => axis,
+            axis @ StaggerAxis::XAxis if coords.x % 2 == 1 => axis,
+            axis @ StaggerAxis::YAxis if coords.y % 2 == 1 => axis,
             _ => StaggerAxis::None,
         }
     }
@@ -373,8 +373,8 @@ impl Default for Map {
         Self {
             unique_tilesets: Vec::new(),
             tilesets: Vec::new(),
-            size: Size::new(0, 0),
-            tile_size: Size::new(0, 0),
+            size: Vector2 { x: 0, y: 0 },
+            tile_size: Vector2 { x: 0, y: 0 },
             tiles: Vec::new(),
             orientation: Orientation::Orthogonal,
             stagger_axis: StaggerAxis::None,
@@ -384,18 +384,19 @@ impl Default for Map {
 
 #[cfg(test)]
 mod tests {
+    use mint::Vector2;
     use super::*;
 
-    const TEST_SIZE: Size<u16> = Size { width: 16, height: 16 };
+    const TEST_SIZE: Vector2<u16> = Vector2 { x: 16, y: 16 };
 
     #[test]
     fn tile_id_test() {
         let mut map = Map::default();
         map.size = TEST_SIZE;
 
-        assert_eq!(map.tile_id((0, 0)), 0);
-        assert_eq!(map.tile_id((3, 0)), 3);
-        assert_eq!(map.tile_id((3, 1)), 19);
+        assert_eq!(map.tile_id([0, 0].into()), 0);
+        assert_eq!(map.tile_id([3, 0].into()), 3);
+        assert_eq!(map.tile_id([3, 1].into()), 19);
     }
 
     #[test]
@@ -403,9 +404,9 @@ mod tests {
         let mut map = Map::default();
         map.size = TEST_SIZE;
 
-        assert_eq!(map.coords(0), (0, 0));
-        assert_eq!(map.coords(3), (3, 0));
-        assert_eq!(map.coords(19), (3, 1));
+        assert_eq!(map.coords(0), [0, 0].into());
+        assert_eq!(map.coords(3), [3, 0].into());
+        assert_eq!(map.coords(19), [3, 1].into());
     }
 
     #[test]
@@ -413,7 +414,7 @@ mod tests {
         let mut map = Map::default();
         map.tile_size = TEST_SIZE;
 
-        assert_eq!(map.to_world_coords((3, 1)), Vec2::new(56.0, -24.0));
+        assert_eq!(map.to_world_coords([3, 1].into()), [56.0, -24.0].into());
     }
 
     #[test]
@@ -422,35 +423,35 @@ mod tests {
         map.orientation = Orientation::Hexagonal;
         map.tile_size = TEST_SIZE;
 
-        let even_coords = (2, 2);
-        let x_odd_coords = (3, 2);
-        let y_odd_coords = (2, 3);
+        let even_coords = [2, 2].into();
+        let x_odd_coords = [3, 2].into();
+        let y_odd_coords = [2, 3].into();
 
         map.stagger_axis = StaggerAxis::XAxis;
-        assert_eq!(map.to_world_coords(even_coords), Vec2::new(32.0, -40.0));
-        assert_eq!(map.to_world_coords(x_odd_coords), Vec2::new(44.0, -48.0));
+        assert_eq!(map.to_world_coords(even_coords), [32.0, -40.0].into());
+        assert_eq!(map.to_world_coords(x_odd_coords), [44.0, -48.0].into());
 
         map.stagger_axis = StaggerAxis::YAxis;
-        assert_eq!(map.to_world_coords(even_coords), Vec2::new(40.0, -32.0));
-        assert_eq!(map.to_world_coords(y_odd_coords), Vec2::new(48.0, -44.0));
+        assert_eq!(map.to_world_coords(even_coords), [40.0, -32.0].into());
+        assert_eq!(map.to_world_coords(y_odd_coords), [48.0, -44.0].into());
     }
 
     #[test]
     fn coords_stagger_axis_test() {
         let mut map = Map::default();
 
-        assert_eq!(map.coords_stagger_axis((0, 0)), StaggerAxis::None);
-        assert_eq!(map.coords_stagger_axis((1, 0)), StaggerAxis::None);
-        assert_eq!(map.coords_stagger_axis((0, 1)), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis([0, 0].into()), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis([1, 0].into()), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis([0, 1].into()), StaggerAxis::None);
 
         map.stagger_axis = StaggerAxis::XAxis;
-        assert_eq!(map.coords_stagger_axis((0, 0)), StaggerAxis::None);
-        assert_eq!(map.coords_stagger_axis((1, 0)), StaggerAxis::XAxis);
-        assert_eq!(map.coords_stagger_axis((0, 1)), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis([0, 0].into()), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis([1, 0].into()), StaggerAxis::XAxis);
+        assert_eq!(map.coords_stagger_axis([0, 1].into()), StaggerAxis::None);
 
         map.stagger_axis = StaggerAxis::YAxis;
-        assert_eq!(map.coords_stagger_axis((0, 0)), StaggerAxis::None);
-        assert_eq!(map.coords_stagger_axis((1, 0)), StaggerAxis::None);
-        assert_eq!(map.coords_stagger_axis((0, 1)), StaggerAxis::YAxis);
+        assert_eq!(map.coords_stagger_axis([0, 0].into()), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis([1, 0].into()), StaggerAxis::None);
+        assert_eq!(map.coords_stagger_axis([0, 1].into()), StaggerAxis::YAxis);
     }
 }

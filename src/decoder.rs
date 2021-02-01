@@ -199,10 +199,10 @@ fn map_tag(attributes: &mut Attributes, map: &mut Map) {
     for attribute in attributes.filter_map(|a| a.ok()) {
         if let Ok(value) = std::str::from_utf8(&attribute.value) {
             match attribute.key {
-                b"width" => register_data(&mut map.size.width, value),
-                b"height" => register_data(&mut map.size.height, value),
-                b"tilewidth" => register_data(&mut map.tile_size.width, value),
-                b"tileheight" => register_data(&mut map.tile_size.height, value),
+                b"width" => register_data(&mut map.size.x, value),
+                b"height" => register_data(&mut map.size.y, value),
+                b"tilewidth" => register_data(&mut map.tile_size.x, value),
+                b"tileheight" => register_data(&mut map.tile_size.y, value),
                 b"orientation" => register_data(&mut map.orientation, value),
                 b"staggeraxis" => register_data(&mut map.stagger_axis, value),
                 _ => { /* Nothing to do */ }
@@ -218,8 +218,8 @@ fn tileset_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
         if let Ok(value) = std::str::from_utf8(&attribute.value) {
             match attribute.key {
                 b"firstgid" => register_data(&mut tileset.firstgid, value),
-                b"tilewidth" => register_data(&mut tileset.size.width, value),
-                b"tileheight" => register_data(&mut tileset.size.height, value),
+                b"tilewidth" => register_data(&mut tileset.size.x, value),
+                b"tileheight" => register_data(&mut tileset.size.y, value),
                 b"tilecount" => register_data(&mut tileset.count, value),
                 b"columns" => register_data(&mut tileset.columns, value),
                 b"name" => register_data(&mut tileset.name, value),
@@ -271,8 +271,8 @@ fn data_text(bytes: &[u8], map: &mut Map) {
 
 #[cfg(test)]
 mod tests {
-    use bevy_math::Size;
     use quick_xml::events::attributes::Attributes;
+    use mint::Vector2;
     use super::*;
 
     #[test]
@@ -298,15 +298,15 @@ mod tests {
     #[test]
     fn map_tag_test() {
         let mut correct_map = Map::default();
-        correct_map.size = Size::new(10, 8);
-        correct_map.tile_size = Size::new(32, 16);
+        correct_map.size = Vector2 { x: 10, y: 8 };
+        correct_map.tile_size = Vector2 { x: 32, y: 16 };
         correct_map.orientation = Orientation::Orthogonal;
         correct_map.stagger_axis = StaggerAxis::XAxis;
 
         let buf = format!(
             "< width=\"{}\" height=\"{}\", tilewidth=\"{}\" tileheight=\"{}\" orientation=\"orthogonal\", staggeraxis=\"x\" >",
-            correct_map.size.width, correct_map.size.height,
-            correct_map.tile_size.width, correct_map.tile_size.height
+            correct_map.size.x, correct_map.size.y,
+            correct_map.tile_size.x, correct_map.tile_size.y
         );
 
         let mut map = Map::default();
@@ -323,7 +323,7 @@ mod tests {
     fn tileset_tag_test() {
         let correct_tileset = TileSet {
             firstgid: 1,
-            size: Size::new(64, 32),
+            size: Vector2 { x: 64, y: 32 },
             count: 6,
             columns: 2,
             name: String::from("correct tileset"),
@@ -332,8 +332,8 @@ mod tests {
 
         let buf = format!(
             "< firstgid=\"{}\" tilewidth=\"{}\" tileheight=\"{}\" tilecount=\"{}\", columns=\"{}\" name=\"{}\" >",
-            correct_tileset.firstgid, correct_tileset.size.width,
-            correct_tileset.size.height, correct_tileset.count,
+            correct_tileset.firstgid, correct_tileset.size.x,
+            correct_tileset.size.y, correct_tileset.count,
             correct_tileset.columns, correct_tileset.name
         );
 
