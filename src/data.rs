@@ -13,7 +13,7 @@ pub const EMPTY_TILE: u16 = 0;
 pub struct Tile {
     /// Identifiant local (au sein du jeu de tuiles) de la tuile.
     pub id: u16,
-    /// Chemin d'accès de la texture associée à la tuile.
+    /// Chemin d'accès relatif de la texture associée à la tuile.
     pub image_path: String,
 }
 

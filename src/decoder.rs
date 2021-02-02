@@ -190,7 +190,7 @@ fn extract_image_path(attributes: &mut Attributes) -> Option<String> {
     attributes
         .filter_map(|a| a.ok())
         .find(|a| a.key == b"source")
-        .map(|a| String::from_utf8_lossy(&a.value).trim_start_matches("../").to_string())
+        .map(|a| String::from_utf8_lossy(&a.value).into_owned())
 }
 
 /// Récupère les paramètres de la map associés au tag `<map>` si présents dans
@@ -229,8 +229,8 @@ fn tileset_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
     }
 }
 
-/// Récupère le chemin d'accès de l'image d'un jeu de tuiles associé au tag
-/// `<tileset><image ../></tileset>` si présent dans la liste d'attributs.
+/// Récupère le chemin d'accès relatif de l'image d'un jeu de tuiles associé au
+/// tag `<tileset><image ../></tileset>` si présent dans la liste d'attributs.
 fn tileset_image_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
     if let Some(path) = extract_image_path(attributes) {
         tileset.origin = TileOrigin::Image(path);
