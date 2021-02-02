@@ -104,6 +104,22 @@ impl TileSet {
     pub fn rows(&self) -> u16 {
         self.count / self.columns
     }
+
+    /// Renvoie le dernier identifiant global appartenant au jeu de tuiles.
+    #[inline]
+    pub fn last_gid(&self) -> u16 {
+        self.firstgid + self.last_id()
+    }
+
+    /// Renvoie le dernier identifiant local de tuile (celui avec la plus haute
+    /// valeur dans le jeu de tuiles).
+    pub fn last_id(&self) -> u16 {
+        match &self.origin {
+            TilesOrigin::Collection(c) => *c.keys().next_back().unwrap_or(&0),
+            _ if self.count > 1 => self.count - 1,
+            _ => 0
+        }
+    }
 }
 
 impl Default for TileSet {
