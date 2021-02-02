@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use mint::{Point2, Vector2};
 
@@ -217,10 +216,10 @@ impl FromStr for StaggerAxis {
 /// Contient toutes les données d'une map composée de tuiles.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Map {
-    /// Contient un unique exemplaire de chaque jeu de tuiles.
-    unique_tilesets: Vec<Arc<TileSet>>,
-    /// Contient pour chaque id global son jeu de tuiles.
-    tilesets: Vec<Option<Arc<TileSet>>>,
+    /// Contient un exemplaire de chaque jeu de tuiles.
+    tilesets: Vec<TileSet>,
+    /// Contient pour chaque id global l'indice de son jeu de tuiles.
+    tileset_indexes: Vec<Option<usize>>,
     /// Taille de la map.
     pub size: Vector2<u16>,
     /// Taille en pixels des tuiles composant la map.
@@ -234,45 +233,52 @@ pub struct Map {
 }
 
 impl Map {
-    /// Ajoute un jeu de tuile à la fin de la liste.
+    /// Ajoute un jeu de tuiles à la fin de la liste.
     #[inline]
     pub(crate) fn add_tileset_without_reordering(&mut self, tileset: TileSet) {
-        self.unique_tilesets.push(Arc::new(tileset));
+        self.tilesets.push(tileset);
     }
 
     /// Réordonne la liste des jeux de tuiles afin qu'ils soient dans l'ordre de
-    /// leur `firstgid`.
+    /// leur `firstgid`, puis associe pour chaque gid un jeu de tuiles.
     pub(crate) fn reorder_tilesets(&mut self) {
-        self.unique_tilesets.sort_unstable_by(|a, b| a.firstgid.cmp(&b.firstgid));
+        self.tilesets.sort_unstable_by(|a, b| a.firstgid.cmp(&b.firstgid));
+
+        self.tileset_indexes.clear();
+        // Le gid 0 ne peut pas posséder de jeu de tuiles.
+        self.tileset_indexes.push(None);
 
         let mut last_gid = 0;
-        self.tilesets.clear();
 
-        for tileset in &self.unique_tilesets {
-            // On comble les trous entre deux jeux de tuiles
+        for (i, tileset) in self.tilesets.iter().enumerate() {
+            // On comble les trous entre le nouveau et le dernier jeu de tuiles.
             for _ in last_gid..(tileset.firstgid - 1) {
-                self.tilesets.push(None);
+                self.tileset_indexes.push(None);
             }
 
-            // On récupère le nombre de tuiles que possède le jeu.
-            let tiles_nb = match &tileset.origin {
-                TileOrigin::Collection(tiles)
-                    => *tiles.keys().next_back().unwrap_or(&0) + 1,
-                TileOrigin::None | TileOrigin::Image(_) => tileset.count,
-            };
+            // On rajoute autant d'indices vers le jeu de tuiles que de tuiles que celui-ci
+            // peut contenir.
 
-            for _ in 0..tiles_nb {
-                self.tilesets.push(Some(tileset.clone()));
+            let last_id = tileset.last_id();
+
+            for _ in 0..=last_id {
+                self.tileset_indexes.push(Some(i));
             }
 
-            last_gid = tileset.firstgid + tiles_nb - 1;
+            last_gid = tileset.firstgid + last_id;
         }
     }
 
     /// Renvoie la liste des jeux de tuiles existants.
     #[inline]
-    pub fn unique_tilesets(&self) -> Vec<&TileSet> {
-        self.unique_tilesets.iter().map(|t| t.as_ref()).collect()
+    pub fn tilesets(&self) -> &[TileSet] {
+        &self.tilesets
+    }
+
+    /// Renvoie la liste mutable des jeux de tuiles existants.
+    #[inline]
+    pub fn tilesets_mut(&mut self) -> &mut [TileSet] {
+        &mut self.tilesets
     }
 
     /// Ajoute un nouveau jeu de tuiles à la map.
@@ -281,23 +287,33 @@ impl Map {
         self.reorder_tilesets();
     }
 
+    /// Ajoute tous les jeux de tuiles de l'itérateur passé en paramètre à la map.
+    pub fn add_tilesets<T: IntoIterator<Item=TileSet>>(&mut self, tilesets: T) {
+        self.tilesets.extend(tilesets);
+        self.reorder_tilesets();
+    }
+
     /// Renvoie le jeu de tuiles associé au gid passé en paramètre.
-    pub fn get_tileset(&self, tile_gid: u16) -> Option<&TileSet> {
-        let index = usize::from(tile_gid - 1);
-
-        if let Some(ref_tileset) = self.tilesets.get(index) {
-            if let Some(tileset) = ref_tileset {
-                return Some(tileset.as_ref());
-            }
+    pub fn get_tileset(&self, gid: u16) -> Option<&TileSet> {
+        match self.tileset_indexes.get(usize::from(gid)) {
+            Some(&Some(i)) => self.tilesets.get(i),
+            _ => None,
         }
+    }
 
-        None
+    /// Renvoie une référence mutable du jeu de tuiles associé au gid passé en
+    /// paramètre.
+    pub fn get_tileset_mut(&mut self, gid: u16) -> Option<&mut TileSet> {
+        match self.tileset_indexes.get(usize::from(gid)) {
+            Some(&Some(i)) => self.tilesets.get_mut(i),
+            _ => None,
+        }
     }
 
     /// Renvoie le jeu de tuiles possédant le firstgid le plus élevé.
     #[inline]
     pub fn last_tileset(&self) -> Option<&TileSet> {
-        self.unique_tilesets.last().map(|ptr| ptr.as_ref())
+        self.tilesets.last()
     }
 
     /// Renvoie la colonne à laquelle appartient la tuile passée en paramètre.
@@ -407,8 +423,8 @@ impl Map {
 impl Default for Map {
     fn default() -> Self {
         Self {
-            unique_tilesets: Vec::new(),
             tilesets: Vec::new(),
+            tileset_indexes: Vec::new(),
             size: Vector2 { x: 0, y: 0 },
             tile_size: Vector2 { x: 0, y: 0 },
             tiles: Vec::new(),
@@ -424,6 +440,53 @@ mod tests {
     use super::*;
 
     const TEST_SIZE: Vector2<u16> = Vector2 { x: 16, y: 16 };
+
+    /// Vérifie que le jeu de tuiles est bien associé à ces gids.
+    fn tileset_gids_association(map: &Map, tileset: &TileSet) {
+        for gid in tileset.firstgid..=tileset.last_gid() {
+            assert_eq!(map.get_tileset(gid), Some(tileset));
+        }
+    }
+
+    #[test]
+    fn tilesets_test() {
+        let mut map = Map::default();
+
+        let tileset_none = TileSet {
+            firstgid: 1,
+            count: 2,
+            origin: TilesOrigin::None,
+            ..Default::default()
+        };
+        let tileset_image = TileSet {
+            firstgid: tileset_none.last_gid() + 1,
+            count: 4,
+            origin: TilesOrigin::Image(String::from("")),
+            ..Default::default()
+        };
+
+        let tile = Tile::new(4, String::from(""));
+        let tileset_collection = TileSet {
+            firstgid: tileset_image.last_gid() + 1,
+            count: 4,
+            origin: TilesOrigin::new_collection(tile),
+            ..Default::default()
+        };
+
+        map.add_tilesets(vec![
+            tileset_none.clone(),
+            tileset_image.clone(),
+            tileset_collection.clone()
+        ]);
+
+        assert_eq!(map.get_tileset(0), None);
+
+        tileset_gids_association(&map, &tileset_none);
+        tileset_gids_association(&map, &tileset_image);
+        tileset_gids_association(&map, &tileset_collection);
+
+        assert_eq!(map.get_tileset(12), None);
+    }
 
     #[test]
     fn tile_id_test() {
