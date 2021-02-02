@@ -45,18 +45,38 @@ pub enum TilesOrigin {
 }
 
 impl TilesOrigin {
+    /// Initialise une nouvelle collection de tuiles avec celle passée en paramètre.
+    pub fn new_collection(tile: Tile) -> Self {
+        let mut collection = BTreeMap::new();
+        collection.insert(tile.id, tile);
+
+        Self::Collection(collection)
+    }
+
+    /// Initialise une nouvelle collection de tuiles avec le contenu de l'itérateur
+    /// passé en paramètre.
+    pub fn new_collection_from<T: IntoIterator<Item=Tile>>(tiles: T) -> Self {
+        let mut collection = BTreeMap::new();
+
+        for tile in tiles {
+            collection.insert(tile.id, tile);
+        }
+
+        Self::Collection(collection)
+    }
+
     /// Insère une tuile dans la collection.
     ///
     /// Si l'origine des tuiles n'est pas une collection, alors crée une nouvelle
     /// collection et écrase l'ancienne origine.
     pub fn insert_collection(&mut self, tile: Tile) {
-        if let Self::Collection(tiles) = self {
-            tiles.insert(tile.id, tile);
-        } else {
-            let mut tiles = BTreeMap::new();
-            tiles.insert(tile.id, tile);
-
-            *self = Self::Collection(tiles);
+        match self {
+            Self::Collection(tiles) => {
+                tiles.insert(tile.id, tile);
+            }
+            _ => {
+                Self::new_collection(tile);
+            }
         }
     }
 }
