@@ -233,7 +233,7 @@ fn tileset_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
 /// tag `<tileset><image ../></tileset>` si présent dans la liste d'attributs.
 fn tileset_image_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
     if let Some(path) = extract_image_path(attributes) {
-        tileset.origin = TileOrigin::Image(path);
+        tileset.origin = TilesOrigin::Image(path);
     }
 }
 
@@ -327,7 +327,7 @@ mod tests {
             count: 6,
             columns: 2,
             name: String::from("correct tileset"),
-            origin: TileOrigin::None
+            origin: TilesOrigin::None
         };
 
         let buf = format!(
@@ -350,7 +350,7 @@ mod tests {
 
     #[test]
     fn tileset_image_tag_test() {
-        let correct_origin = TileOrigin::Image(String::from("path"));
+        let correct_origin = TilesOrigin::Image(String::from("path"));
         let buf = b"< source=\"path\" >";
 
         let mut tileset = TileSet::default();

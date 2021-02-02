@@ -35,7 +35,7 @@ impl Default for Tile {
 
 /// Origine des tuiles d'un jeu de tuiles.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum TileOrigin {
+pub enum TilesOrigin {
     /// Les tuiles partagent la même image.
     Image(String),
     /// Chaque tuile possède sa propre image.
@@ -44,10 +44,10 @@ pub enum TileOrigin {
     None,
 }
 
-impl TileOrigin {
+impl TilesOrigin {
     /// Insère une tuile dans la collection.
     ///
-    /// Si l'origine de la tuile n'est pas une collection, alors crée une nouvelle
+    /// Si l'origine des tuiles n'est pas une collection, alors crée une nouvelle
     /// collection et écrase l'ancienne origine.
     pub fn insert_collection(&mut self, tile: Tile) {
         if let Self::Collection(tiles) = self {
@@ -75,7 +75,7 @@ pub struct TileSet {
     /// Nom du jeu de tuile.
     pub name: String,
     /// Origine des tuiles du jeu.
-    pub origin: TileOrigin,
+    pub origin: TilesOrigin,
 }
 
 impl TileSet {
@@ -94,7 +94,7 @@ impl Default for TileSet {
             count: 0,
             columns: 0,
             name: String::from("unnamed"),
-            origin: TileOrigin::None,
+            origin: TilesOrigin::None,
         }
     }
 }
