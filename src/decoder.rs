@@ -202,15 +202,23 @@ impl<'a> TMXDecoder<'a> {
     }
 }
 
-/// Récupère le chemin d'accès d'une image si présent parmi les attributs.
-///
-/// La clef associée au chemin d'accès doit être "source".
-/// Exemple : <.. source="path">
-fn extract_image_path(attributes: &mut Attributes) -> Option<String> {
-    attributes
-        .filter_map(|a| a.ok())
-        .find(|a| a.key == b"source")
-        .map(|a| String::from_utf8_lossy(&a.value).into_owned())
+/// Récupère les paramètres d'une image associés au tag `<image>` si présents
+/// dans la liste d'attributs.
+fn extract_image(attributes: &mut Attributes) -> Image {
+    let mut image = Image::default();
+
+    for attribute in attributes.filter_map(|a| a.ok()) {
+        if let Ok(value) = std::str::from_utf8(&attribute.value) {
+            match attribute.key {
+                b"source" => image.source = value.to_string(),
+                b"width" => register_data(&mut image.size.x, value),
+                b"height" => register_data(&mut image.size.y, value),
+                _ => { /* Nothing to do */ }
+            }
+        }
+    }
+
+    image
 }
 
 /// Récupère les paramètres de la map associés au tag `<map>` si présents dans
@@ -249,12 +257,10 @@ fn tileset_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
     }
 }
 
-/// Récupère le chemin d'accès relatif de l'image d'un jeu de tuiles associé au
-/// tag `<tileset><image ../></tileset>` si présent dans la liste d'attributs.
+/// Récupère les paramètres de l'image d'un jeu de tuiles associés au tag
+/// `<tileset><image ../></tileset>` si présent dans la liste d'attributs.
 fn tileset_image_tag(attributes: &mut Attributes, tileset: &mut TileSet) {
-    if let Some(path) = extract_image_path(attributes) {
-        tileset.origin = TilesOrigin::Image(path);
-    }
+    tileset.origin = TilesOrigin::Image(extract_image(attributes));
 }
 
 /// Récupère les paramètres de tuile associés au tag `<tile>` si présents dans
@@ -270,12 +276,10 @@ fn tile_tag(attributes: &mut Attributes, tile: &mut Tile) {
     }
 }
 
-/// Récupère le chemin d'accès de l'image d'une tuile associé au tag
+/// Récupère les paramètres de l'image d'une tuile associés au tag
 /// `<tile><image ../></tile>` si présent dans la liste d'attributs.
 fn tile_image_tag(attributes: &mut Attributes, tile: &mut Tile) {
-    if let Some(path) = extract_image_path(attributes) {
-        tile.image_path = path;
-    }
+    tile.image = extract_image(attributes);
 }
 
 /// Récupère les paramètres de groupe d'objets associés au tag `<objectgroup>`
@@ -339,12 +343,18 @@ mod tests {
     }
 
     #[test]
-    fn extract_image_path_test() {
-        let buf = b"< source=\"path\" >";
-        let mut attributes = Attributes::new(buf, 0);
+    fn extract_image_test() {
+        let correct_image = Image::new("path", Vector2 { x: 62, y: 31});
 
-        let path = extract_image_path(&mut attributes);
-        assert_eq!(path, Some(String::from("path")));
+        let buf = format!(
+            r#"< source="{}" width="{}" height="{}" >"#,
+            correct_image.source, correct_image.size.x, correct_image.size.y
+        );
+
+        let mut attributes = Attributes::new(buf.as_bytes(), 0);
+
+        let image = extract_image(&mut attributes);
+        assert_eq!(image, correct_image);
     }
 
     #[test]
@@ -402,8 +412,8 @@ mod tests {
 
     #[test]
     fn tileset_image_tag_test() {
-        let correct_origin = TilesOrigin::Image(String::from("path"));
-        let buf = b"< source=\"path\" >";
+        let correct_origin = TilesOrigin::Image(Image::default());
+        let buf = b"< source=\"\" >";
 
         let mut tileset = TileSet::default();
         let mut attributes = Attributes::new(buf, 0);

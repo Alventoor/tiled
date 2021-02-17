@@ -7,28 +7,50 @@ use mint::{Point2, Vector2};
 /// Identifiant global représentant sur la map l'absence de tuile.
 pub const EMPTY_TILE: u16 = 0;
 
+/// Contient les données associées à une image.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Image {
+    /// Chemin d'accès de l'image.
+    pub source: String,
+    /// Taille de l'image en pixels.
+    pub size: Vector2<u16>,
+}
+
+impl Image {
+    /// Crée une nouvelle image.
+    pub fn new(source: impl Into<String>, size: Vector2<u16>) -> Self {
+        Self { source: source.into(), size }
+    }
+}
+
+impl Default for Image {
+    fn default() -> Self {
+        Self::new("", Vector2 { x: 0, y: 0 })
+    }
+}
+
 /// Contient les données associées à une tuile.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Tile {
     /// Identifiant local (au sein du jeu de tuiles) de la tuile.
     pub id: u16,
-    /// Chemin d'accès relatif de la texture associée à la tuile.
-    pub image_path: String,
+    /// Image associée à la tuile.
+    pub image: Image,
 }
 
 impl Tile {
     /// Crée une nouvelle tuile avec l'image et l'identifiant passés en paramètre.
-    pub fn new(id: u16, image_path: String) -> Self {
+    pub fn new(id: u16, image: Image) -> Self {
         Tile {
             id,
-            image_path
+            image
         }
     }
 }
 
 impl Default for Tile {
     fn default() -> Self {
-        Tile::new(0, String::from("empty path"))
+        Tile::new(0, Image::default())
     }
 }
 
@@ -36,7 +58,7 @@ impl Default for Tile {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TilesOrigin {
     /// Les tuiles partagent la même image.
-    Image(String),
+    Image(Image),
     /// Chaque tuile possède sa propre image.
     Collection(BTreeMap<u16, Tile>),
     /// Les tuiles ne possèdent aucune origine.
@@ -522,14 +544,15 @@ mod tests {
             origin: TilesOrigin::None,
             ..Default::default()
         };
+
         let tileset_image = TileSet {
             firstgid: tileset_none.last_gid() + 1,
             count: 4,
-            origin: TilesOrigin::Image(String::from("")),
+            origin: TilesOrigin::Image(Image::default()),
             ..Default::default()
         };
 
-        let tile = Tile::new(4, String::from(""));
+        let tile = Tile::new(4, Image::default());
         let tileset_collection = TileSet {
             firstgid: tileset_image.last_gid() + 1,
             count: 4,
