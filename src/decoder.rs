@@ -433,18 +433,6 @@ mod tests {
         tile_tag(&mut attributes, &mut tile);
         assert_eq!(tile.id, correct_id);
     }
-
-    #[test]
-    fn tile_image_tag_test() {
-        let correct_path = String::from("path");
-        let buf = b"< source=\"path\" >";
-
-        let mut tile = Tile::default();
-        let mut attributes = Attributes::new(buf, 0);
-
-        tile_image_tag(&mut attributes, &mut tile);
-        assert_eq!(tile.image_path, correct_path);
-    }
     
     #[test]
     fn object_group_tag_test() {
