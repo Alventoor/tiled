@@ -278,6 +278,8 @@ fn tile_image_tag(attributes: &mut Attributes, tile: &mut Tile) {
     }
 }
 
+/// Récupère les paramètres de groupe d'objets associés au tag `<objectgroup>`
+/// si présents dans la liste d'attributs.
 fn object_group_tag(attributes: &mut Attributes, object_group: &mut ObjectGroup) {
     for attribute in attributes.filter_map(|a| a.ok()) {
         if let Ok(value) = std::str::from_utf8(&attribute.value) {
@@ -290,6 +292,8 @@ fn object_group_tag(attributes: &mut Attributes, object_group: &mut ObjectGroup)
     }
 }
 
+/// Récupère les paramètres d'un objet associés au tag `<object>` si présents
+/// dans la liste d'attributs.
 fn object_tag(attributes: &mut Attributes, object: &mut Object) {
     for attribute in attributes.filter_map(|a| a.ok()) {
         if let Ok(value) = std::str::from_utf8(&attribute.value) {
