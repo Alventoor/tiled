@@ -73,9 +73,7 @@ impl TilesOrigin {
             Self::Collection(tiles) => {
                 tiles.insert(tile.id, tile);
             }
-            _ => {
-                Self::new_collection(tile);
-            }
+            _ => *self = Self::new_collection(tile),
         }
     }
 }
