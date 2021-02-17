@@ -132,6 +132,69 @@ impl Default for TileSet {
     }
 }
 
+/// Contient les données associées à un objet.
+///
+/// Contrairement aux tuiles, les objets possèdent l'avantages de ne pas avoir à
+/// être alignés sur la grille, et peuvent donc servir à représenter diverses
+/// informations.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Object {
+    /// Identifiant unique de l'objet.
+    pub id: u16,
+    /// Identifiant global de la tuile liée à l'objet.
+    ///
+    /// Dans le cas où aucune tuile n'est liée à l'objet, l'identifiant vaut 0.
+    pub gid: u16,
+    /// Coordonnées de l'objet en pixels.
+    pub coords: Point2<u16>,
+    /// Taille de l'objet en pixels.
+    pub size: Vector2<u16>,
+}
+
+impl Object {
+    /// Renvoie l'identifiant global de l'objet seulement s'il est valide.
+    ///
+    /// Un gid est invalide lorsqu'il est égal à 0.
+    pub fn valid_gid(&self) -> Option<u16> {
+        if self.gid == 0 { None } else { Some(self.gid) }
+    }
+}
+
+impl Default for Object {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            gid: 0,
+            coords: Point2 { x: 0, y: 0 },
+            size: Vector2 { x: 0, y: 0 },
+        }
+    }
+}
+
+/// Contient les données associées à un groupe d'objets.
+///
+/// Tout comme les tuiles, les objets sont rassemblés par calques, ici appelés
+/// groupes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ObjectGroup {
+    /// Identifiant unique du calque.
+    pub id: u16,
+    /// Nom du groupe d'objet.
+    pub name: String,
+    /// Liste des objets appartenant au groupe.
+    pub objects: Vec<Object>,
+}
+
+impl Default for ObjectGroup {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            name: String::from(""),
+            objects: Vec::new(),
+        }
+    }
+}
+
 /// Représente les erreurs possibles lors de la conversion d'une chaîne de
 /// caractère.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -224,6 +287,8 @@ pub struct Map {
     pub tile_size: Vector2<u16>,
     /// Liste d'identifiants globaux des tuiles composant la map.
     pub tiles: Vec<u16>,
+    /// Liste des groupes d'objets associés à la map.
+    pub object_groups: Vec<ObjectGroup>,
     /// Orientation de la map.
     pub orientation: Orientation,
     /// Axe de décalage de la map.
@@ -426,6 +491,7 @@ impl Default for Map {
             size: Vector2 { x: 0, y: 0 },
             tile_size: Vector2 { x: 0, y: 0 },
             tiles: Vec::new(),
+            object_groups: Vec::new(),
             orientation: Orientation::Orthogonal,
             stagger_axis: StaggerAxis::None,
         }

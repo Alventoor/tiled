@@ -7,13 +7,15 @@ use quick_xml::events::attributes::Attributes;
 
 use crate::data::*;
 
-const MAP_TAG: &'static [u8] = b"map";
-const TILESET_TAG: &'static [u8] = b"tileset";
-const IMAGE_TAG: &'static [u8] = b"image";
-const TILE_TAG: &'static [u8] = b"tile";
-const GRID_TAG: &'static [u8]= b"grid";
-const LAYER_TAG: &'static [u8] = b"layer";
-const DATA_TAG: &'static [u8] = b"data";
+const MAP_TAG: &[u8] = b"map";
+const TILESET_TAG: &[u8] = b"tileset";
+const IMAGE_TAG: &[u8] = b"image";
+const TILE_TAG: &[u8] = b"tile";
+const GRID_TAG: &[u8]= b"grid";
+const LAYER_TAG: &[u8] = b"layer";
+const DATA_TAG: &[u8] = b"data";
+const OBJECT_GROUP_TAG: &[u8] = b"objectgroup";
+const OBJECT_TAG: &[u8] = b"object";
 
 /// Tente de convertir la chaîne de caractère dans le type de `buffer`. Si la
 /// conversion réussie, enregistre la valeur dans `buffer`.
@@ -49,6 +51,10 @@ enum TMXState {
     Layer,
     /// On se situe dans le tag `<data>` du parent `<layer>`.
     Data,
+    /// On se situe dans le tag `<objectgroup>`.
+    ObjectGroup(ObjectGroup),
+    /// On se situe dans le tag `<object>` du parent `<objectgroup>`.
+    Object(ObjectGroup, Object),
     /// Tag inconnu. Sa donnée représente son parent.
     Unknown(Box<TMXState>),
 }
@@ -63,11 +69,14 @@ impl TMXState {
             Self::Map if name == MAP_TAG => Self::Map,
             Self::Map if name == TILESET_TAG => Self::TileSet(TileSet::default()),
             Self::Map if name == LAYER_TAG => Self::Layer,
+            Self::Map if name == OBJECT_GROUP_TAG => Self::ObjectGroup(ObjectGroup::default()),
             Self::TileSet(tileset) if name == IMAGE_TAG => Self::TileSetImage(tileset),
             Self::TileSet(tileset) if name == TILE_TAG => Self::Tile(tileset, Tile::default()),
             Self::TileSet(tileset) if name == GRID_TAG => Self::Grid(tileset),
             Self::Tile(tileset, tile) if name == IMAGE_TAG => Self::TileImage(tileset, tile),
             Self::Layer if name == DATA_TAG => Self::Data,
+            Self::ObjectGroup(object_group) if name == OBJECT_TAG
+                => Self::Object(object_group, Object::default()),
             _ => Self::Unknown(Box::new(self)),
         }
     }
@@ -76,12 +85,13 @@ impl TMXState {
     pub fn into_parent(self) -> Self {
         match self {
             Self::Map => self,
-            Self::TileSet(_) | Self::Layer => Self::Map,
+            Self::TileSet(_) | Self::Layer | Self::ObjectGroup(_) => Self::Map,
             Self::Tile(tileset, _)
             | Self::TileSetImage(tileset)
             | Self::Grid(tileset) => Self::TileSet(tileset),
             Self::TileImage(tileset, tile) => Self::Tile(tileset, tile),
             Self::Data =>Self::Layer,
+            Self::Object(object_group, _) => Self::ObjectGroup(object_group),
             Self::Unknown(state) => *state,
         }
     }
@@ -122,6 +132,8 @@ impl<'a> TMXDecoder<'a> {
             TMXState::TileSetImage(ref mut tileset) => tileset_image_tag(attributes, tileset),
             TMXState::Tile(_, ref mut tile) => tile_tag(attributes, tile),
             TMXState::TileImage(_, ref mut tile) => tile_image_tag(attributes, tile),
+            TMXState::ObjectGroup(ref mut group) => object_group_tag(attributes, group),
+            TMXState::Object(_, ref mut object) => object_tag(attributes, object),
             _ => { /* Nothing to do */ }
         }
     }
@@ -146,6 +158,14 @@ impl<'a> TMXDecoder<'a> {
             TMXState::Tile(mut tileset, tile) => {
                 tileset.origin.insert_collection(tile);
                 TMXState::TileSet(tileset)
+            }
+            TMXState::ObjectGroup(group) => {
+                map.object_groups.push(group);
+                TMXState::Map
+            }
+            TMXState::Object(mut group, object) => {
+                group.objects.push(object);
+                TMXState::ObjectGroup(group)
             }
             _ => state.into_parent()
         };
@@ -258,6 +278,34 @@ fn tile_image_tag(attributes: &mut Attributes, tile: &mut Tile) {
     }
 }
 
+fn object_group_tag(attributes: &mut Attributes, object_group: &mut ObjectGroup) {
+    for attribute in attributes.filter_map(|a| a.ok()) {
+        if let Ok(value) = std::str::from_utf8(&attribute.value) {
+            match attribute.key {
+                b"id" => register_data(&mut object_group.id, value),
+                b"name" => register_data(&mut object_group.name, value),
+                _ => { /* Nothing to do */ }
+            }
+        }
+    }
+}
+
+fn object_tag(attributes: &mut Attributes, object: &mut Object) {
+    for attribute in attributes.filter_map(|a| a.ok()) {
+        if let Ok(value) = std::str::from_utf8(&attribute.value) {
+            match attribute.key {
+                b"id" => register_data(&mut object.id, value),
+                b"gid" => register_data(&mut object.gid, value),
+                b"x" => register_data(&mut object.coords.x, value),
+                b"y" => register_data(&mut object.coords.y, value),
+                b"width" => register_data(&mut object.size.x, value),
+                b"height" => register_data(&mut object.size.y, value),
+                _ => { /* Nothing to do */ }
+            }
+        }
+    }
+}
+
 /// Récupère les identifiants globaux des tuiles présents au sein du tag
 /// `<data>`.
 fn data_text(bytes: &[u8], map: &mut Map) {
@@ -272,7 +320,7 @@ fn data_text(bytes: &[u8], map: &mut Map) {
 #[cfg(test)]
 mod tests {
     use quick_xml::events::attributes::Attributes;
-    use mint::Vector2;
+    use mint::{Vector2, Point2};
     use super::*;
 
     #[test]
@@ -382,6 +430,48 @@ mod tests {
 
         tile_image_tag(&mut attributes, &mut tile);
         assert_eq!(tile.image_path, correct_path);
+    }
+    
+    #[test]
+    fn object_group_tag_test() {
+        let correct_object_group = ObjectGroup {
+            id: 3,
+            name: String::from("object group"),
+            objects: Vec::new(),
+        };
+
+        let buf = format!(
+            "< id=\"{}\" name=\"{}\"  >",
+            correct_object_group.id, correct_object_group.name,
+        );
+
+        let mut object_group = ObjectGroup::default();
+        let mut attributes = Attributes::new(&buf.as_bytes(), 0);
+
+        object_group_tag(&mut attributes, &mut object_group);
+        assert_eq!(object_group, correct_object_group);
+    }
+
+    #[test]
+    fn object_tag_test() {
+        let correct_object = Object {
+            id: 3,
+            gid: 4,
+            coords: Point2 { x: 32, y: 64 },
+            size: Vector2 { x: 16, y: 16 }
+        };
+
+        let buf = format!(
+            "< id=\"{}\" gid=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"  >",
+            correct_object.id, correct_object.gid, correct_object.coords.x,
+            correct_object.coords.y, correct_object.size.x, correct_object.size.y
+        );
+
+        let mut object = Object::default();
+        let mut attributes = Attributes::new(&buf.as_bytes(), 0);
+
+        object_tag(&mut attributes, &mut object);
+        assert_eq!(object, correct_object);
     }
 
     #[test]
