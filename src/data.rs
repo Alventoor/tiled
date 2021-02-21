@@ -61,8 +61,6 @@ pub enum TilesOrigin {
     Image(Image),
     /// Chaque tuile possède sa propre image.
     Collection(BTreeMap<u16, Tile>),
-    /// Les tuiles ne possèdent aucune origine.
-    None,
 }
 
 impl TilesOrigin {
@@ -114,7 +112,7 @@ pub struct TileSet {
     /// Nom du jeu de tuile.
     pub name: String,
     /// Origine des tuiles du jeu.
-    pub origin: TilesOrigin,
+    pub origin: Option<TilesOrigin>,
 }
 
 impl TileSet {
@@ -134,7 +132,7 @@ impl TileSet {
     /// valeur dans le jeu de tuiles).
     pub fn last_id(&self) -> u16 {
         match &self.origin {
-            TilesOrigin::Collection(c) => *c.keys().next_back().unwrap_or(&0),
+            Some(TilesOrigin::Collection(c)) => *c.keys().next_back().unwrap_or(&0),
             _ if self.count > 1 => self.count - 1,
             _ => 0
         }
@@ -149,7 +147,7 @@ impl Default for TileSet {
             count: 0,
             columns: 0,
             name: String::from("unnamed"),
-            origin: TilesOrigin::None,
+            origin: None,
         }
     }
 }
@@ -541,14 +539,14 @@ mod tests {
         let tileset_none = TileSet {
             firstgid: 1,
             count: 2,
-            origin: TilesOrigin::None,
+            origin: None,
             ..Default::default()
         };
 
         let tileset_image = TileSet {
             firstgid: tileset_none.last_gid() + 1,
             count: 4,
-            origin: TilesOrigin::Image(Image::default()),
+            origin: Some(TilesOrigin::Image(Image::default())),
             ..Default::default()
         };
 
@@ -556,7 +554,7 @@ mod tests {
         let tileset_collection = TileSet {
             firstgid: tileset_image.last_gid() + 1,
             count: 4,
-            origin: TilesOrigin::new_collection(tile),
+            origin: Some(TilesOrigin::new_collection(tile)),
             ..Default::default()
         };
 
