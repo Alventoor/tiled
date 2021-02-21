@@ -3,6 +3,10 @@ use std::fmt;
 use std::str::FromStr;
 
 use mint::{Point2, Vector2};
+use quick_xml::de::from_reader;
+use serde::Deserialize;
+
+use crate::deserial::TMXError;
 
 /// Identifiant global représentant sur la map l'absence de tuile.
 pub const EMPTY_TILE: u16 = 0;
@@ -30,7 +34,8 @@ impl Default for Image {
 }
 
 /// Contient les données associées à une tuile.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
+#[serde(rename = "tile")]
 pub struct Tile {
     /// Identifiant local (au sein du jeu de tuiles) de la tuile.
     pub id: u16,
@@ -195,13 +200,15 @@ impl Default for Object {
 ///
 /// Tout comme les tuiles, les objets sont rassemblés par calques, ici appelés
 /// groupes.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
+#[serde(rename = "objectgroup")]
 pub struct ObjectGroup {
     /// Identifiant unique du calque.
     pub id: u16,
     /// Nom du groupe d'objet.
     pub name: String,
     /// Liste des objets appartenant au groupe.
+    #[serde(rename = "object")]
     pub objects: Vec<Object>,
 }
 
@@ -243,7 +250,8 @@ impl fmt::Display for ParsingError {
 }
 
 /// Représente les différentes orientations possibles pour une grille.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Orientation {
     /// Il s'agit d'une grille orthogonale.
     Orthogonal,
@@ -271,13 +279,16 @@ impl FromStr for Orientation {
 }
 
 /// Représente l'axe de décalage d'une map.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize)]
 pub enum StaggerAxis {
     /// La map possède un décalage sur l'axe x.
+    #[serde(rename = "x")]
     XAxis,
     /// La map possède un décalage sur l'axe y.
+    #[serde(rename = "y")]
     YAxis,
     /// Aucun axe de la map n'a de décalage.
+    #[serde(skip)]
     None,
 }
 
@@ -298,9 +309,9 @@ impl FromStr for StaggerAxis {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Map {
     /// Contient un exemplaire de chaque jeu de tuiles.
-    tilesets: Vec<TileSet>,
+    pub(crate) tilesets: Vec<TileSet>,
     /// Contient pour chaque id global l'indice de son jeu de tuiles.
-    tileset_indexes: Vec<Option<usize>>,
+    pub(crate) tileset_indexes: Vec<Option<usize>>,
     /// Taille de la map.
     pub size: Vector2<u16>,
     /// Taille en pixels des tuiles composant la map.
@@ -316,10 +327,15 @@ pub struct Map {
 }
 
 impl Map {
-    /// Ajoute un jeu de tuiles à la fin de la liste.
+    /// Instancie une nouvelle map depuis les données d'un fichier `.tmx`.
+    ///
+    /// # Erreurs
+    ///
+    /// Cette fonction retourne une erreur si les données passées en paramètre ne
+    /// sont pas au format XML.
     #[inline]
-    pub(crate) fn add_tileset_without_reordering(&mut self, tileset: TileSet) {
-        self.tilesets.push(tileset);
+    pub fn load_tmx<D: AsRef<[u8]>>(data: D) -> Result<Self, TMXError> {
+        from_reader(data.as_ref())
     }
 
     /// Réordonne la liste des jeux de tuiles afin qu'ils soient dans l'ordre de
@@ -366,7 +382,7 @@ impl Map {
 
     /// Ajoute un nouveau jeu de tuiles à la map.
     pub fn add_tileset(&mut self, tileset: TileSet) {
-        self.add_tileset_without_reordering(tileset);
+        self.tilesets.push(tileset);
         self.reorder_tilesets();
     }
 
@@ -525,11 +541,38 @@ mod tests {
 
     const TEST_SIZE: Vector2<u16> = Vector2 { x: 16, y: 16 };
 
-    /// Vérifie que le jeu de tuiles est bien associé à ces gids.
+    /// Vérifie que le jeu de tuiles est associé aux gids correspondant.
     fn tileset_gids_association(map: &Map, tileset: &TileSet) {
         for gid in tileset.firstgid..=tileset.last_gid() {
             assert_eq!(map.get_tileset(gid), Some(tileset));
         }
+    }
+
+    #[test]
+    fn test_load_tmx_map() {
+        let src = r#"
+        <map orientation="isometric" staggeraxis="x" width="10" height="10" tilewidth="24" tileheight="24">
+            <layer id="1" name="Calque de Tuiles 1" width="10" height="10">
+                <data encoding="csv">
+                    0,0,0,
+                    3,2,1
+                </data>
+            </layer>
+        </map>"#;
+
+        let should_be = Map {
+            tilesets: vec![],
+            tileset_indexes: vec![None],
+            size: Vector2 { x: 10, y: 10 },
+            tile_size: Vector2 {x: 24, y: 24 },
+            tiles: vec![0, 0, 0, 3, 2, 1],
+            object_groups: vec![],
+            orientation: Orientation::Isometric,
+            stagger_axis: StaggerAxis::XAxis
+        };
+
+        let map = Map::load_tmx(src).unwrap();
+        assert_eq!(map, should_be);
     }
 
     #[test]

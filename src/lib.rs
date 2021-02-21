@@ -1,5 +1,5 @@
 mod data;
-mod decoder;
+mod deserial;
 
 pub use crate::data::*;
-pub use crate::decoder::*;
+pub use crate::deserial::*;
